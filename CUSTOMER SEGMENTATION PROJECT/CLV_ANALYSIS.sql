@@ -1,4 +1,4 @@
-CREATE TABLE "nexa_sat".nexa_sat (
+CREATE TABLE nexasat (
 Customer_ID varchar(50),
 gender varchar(3),
 Partner varchar(3),
@@ -14,27 +14,23 @@ Multiple_line varchar(3),
 Tech_Support varchar(3),
 Churn int);
 
-select * from "nexa_sat".nexa_sat LIMIT 5;
-SET search_path to "nexa_sat";
+select * from nexasat LIMIT 5;
 
-select * from nexa_sat LIMIT 5;
-
-select customer_id, gender from nexa_sat LIMIT 5;
-
-Select customer_id, tenure_months from nexa_sat
+-- View customers who has stayed more then one year
+Select customer_id, tenure_months from nexasat
 where tenure_months >12;
 
 -- Checking for missings values
-SELECT COUNT(*) - COUNT(Customer_ID) AS missing_data FROM nexa_sat;
+SELECT COUNT(*) - COUNT(Customer_ID) AS missing_data FROM nexasat;
 
--- checking for duplicates
+-- Checking for duplicates
 SELECT Customer_ID, COUNT(*) 
-FROM nexa_sat
+FROM nexasat
 GROUP BY Customer_ID
 HAVING COUNT(*) > 1;
 
 
--- exploring the dataset
+-- Exploring the dataset
 SELECT 
   AVG(Monthly_Bill_Amount) AS avg_bill,
   MIN(Monthly_Bill_Amount) AS min_bill,
@@ -42,30 +38,30 @@ SELECT
   AVG(Call_Duration) AS avg_call_duration,
   AVG(Data_Usage) AS avg_data_usage,
   COUNT(DISTINCT Plan_Type) AS num_plans
-FROM nexa_sat;
+FROM nexasat;
 
 
 -- Average tenure per plan level
-SELECT AVG(Tenure_Months) as average_ten, Plan_Level FROM nexa_sat 
+SELECT AVG(Tenure_Months) as average_ten, Plan_Level FROM nexasat 
 GROUP BY Plan_Level;
 
--- -- Gender distribution
-SELECT gender, COUNT(*) FROM nexa_sat GROUP BY gender;
+-- Gender distribution
+SELECT gender, COUNT(*) FROM nexasat GROUP BY gender;
 
 -- Partner status distribution
-SELECT Partner, COUNT(*) FROM nexa_sat GROUP BY Partner; 
+SELECT Partner, COUNT(*) FROM nexasat GROUP BY Partner; 
 
 -- Dependents status distribution 
-SELECT Dependents, COUNT(*) FROM nexa_sat GROUP BY Dependents;
+SELECT Dependents, COUNT(*) FROM nexasat GROUP BY Dependents;
 
 -- Total users still in service
 SELECT COUNT(Customer_ID) AS existing_users
-FROM nexa_sat
+FROM nexasat
 where Churn = 0;
 
 -- Average tenure of churned customers per plan_level
 SELECT Plan_Level, AVG(Tenure_Months) AS average_tenure
-FROM nexa_sat WHERE Churn = 1
+FROM nexasat WHERE Churn = 1
 GROUP BY 1;
 
 -- Churn count by plan_level
@@ -76,7 +72,7 @@ FROM nexa_sat where Churn = 1 GROUP BY 2;
 -- Create a table of existing users only
 
 CREATE TABLE existing_users AS
-SELECT * FROM nexa_sat
+SELECT * FROM nexasat
 WHERE Churn = 0;
 
 
@@ -93,21 +89,21 @@ WHERE  Multiple_Lines = 'No' AND (Dependents = 'Yes' OR Partner = 'Yes') ;
 SELECT Customer_ID, Plan_level FROM existing_users 
 WHERE  Dependents = 'No' AND Tech_Support = 'No' ;
 
--- -- total users by level
+-- Total users by level
 SELECT Plan_Level, COUNT(Customer_ID) AS total_users
 FROM existing_users 
 GROUP BY 1;
  
--- total revenue by level
+-- Total revenue by level
 SELECT Plan_Level , (SUM(Monthly_Bill_Amount) AS Revenue
 FROM existing_users 
 GROUP BY 1;
 
--- average tenure of existing users
+-- Average tenure of existing users
 SELECT AVG(Tenure_Months) AS Avg_Tenure
 FROM existing_users;
 
----- Altere the table and adding Customer Life value Clv column
+-- Altere the table and adding Customer Life value Clv column
 ALTER TABLE existing_users ADD COLUMN Clv FLOAT; 
 
 -- Calculate the Clv 
@@ -118,8 +114,7 @@ SET Clv = (Monthly_Bill_Amount * Tenure_Months);
 --Add new column for Clv scores
 ALTER TABLE existing_users ADD COLUMN Clv_Score FLOAT;
 
--- calculate the Clv score, the weight value of the variables was calculated
--- using Random Forest model
+-- Calculate the Clv score, the weight value of the variables was calculated using Random Forest model
 UPDATE existing_users
 SET Clv_Score = 
     (Data_Usage * 0.2336) +
@@ -141,7 +136,7 @@ SELECT
 FROM existing_users;
 
 
--- -- Add a new column to store the Clv segment
+-- Add a new column to store the Clv segment
 ALTER TABLE existing_users ADD COLUMN Clv_Segment VARCHAR(20);
 
 -- Group users into segment based of their clv scores
@@ -157,19 +152,18 @@ SET Clv_Segment =
         ELSE 'Churn Risk'
     END;
 
--- view customer clv score and segment
+-- View customer clv score and segment
 SELECT Customer_id, Clv, Clv_score, Clv_segment from existing_users LIMIT 20;
 
--- view high value customers
+-- View high value customers
 SELECT customer_id, Clv_segment FROM existing_users where Clv_segment = 'High Value';
 
 
--- view customers at the risk of churn
+-- View customers at the risk of churn
 SELECT customer_id, Clv_segment FROM existing_users where Clv_segment = 'Churn Risk';
 
 -- Analyze the segment
 --Average bill and tenure per segment
-
 SELECT Clv_segment,
        ROUND(AVG(Monthly_bill_amount::INT),2) AS Avg_bill, 
        ROUND(AVG(tenure_months::INT),2) AS Avg_tenure 
@@ -178,7 +172,6 @@ GROUP BY Clv_segment;
 
 
 -- Premium plan across each segment
-
 SELECT Clv_segment, COUNT(plan_level), 
 WHERE plan_level = 'Premium'
 GROUP BY 1;
@@ -207,15 +200,13 @@ AND (dependents = 'Yes' OR Partner = 'Yes')
 AND plan_level = 'Basic';
 
 
--- Upselling premium for basic users with churn risk. Discount for the first few months 
--- could be offered to interest them.
+-- Upselling premium for basic users with churn risk. Discount for the first few months could be offered to interest them.
 SELECT customer_id
 FROM existing_users
 WHERE Clv_segment = 'Churn Risk'
 AND plan_level = 'Basic';
 
---Upselling basic to premium for longer lock in period and higher ARPU 
--- for high and moderate value users
+--Upselling basic to premium for longer lock in period and higher ARPU for high and moderate value users
 SELECT customer_id, monthly_bill_amount
 FROM existing_users
 WHERE plan_level = 'Basic'
